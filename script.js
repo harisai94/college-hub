@@ -54,7 +54,8 @@ function renderNotes(notes) {
         const card = document.createElement('div');
         card.className = 'note-card';
         const [iconClass, iconColor] = getFileIcon(note.fileType);
-        const downloadLink = note.filePath ? `<a class="download-btn" href="${note.filePath}" target="_blank" rel="noopener noreferrer"><i class="fa-solid fa-download"></i></a>` : '';
+        const downloadLink = note.filePath ? `<a class="card-action-btn download-btn" href="${note.filePath}" target="_blank" rel="noopener noreferrer" title="Download file"><i class="fa-solid fa-download"></i></a>` : '';
+        const deleteBtn = `<button type="button" class="card-action-btn delete-btn" data-note-id="${note.id}" title="Delete note"><i class="fa-solid fa-trash"></i></button>`;
 
         card.innerHTML = `
             <div class="card-icon" style="color: ${iconColor}">
@@ -68,7 +69,10 @@ function renderNotes(notes) {
             <p class="card-note">${note.noteText ? note.noteText : 'No text note added.'}</p>
             <div class="card-footer">
                 <span>By ${note.uploaderName} • ${formatDate(note.createdAt)}</span>
-                ${downloadLink}
+                <div class="card-actions">
+                    ${downloadLink}
+                    ${deleteBtn}
+                </div>
             </div>
         `;
         notesContainer.appendChild(card);
@@ -121,7 +125,7 @@ function startRealtimeUpdates() {
     notesEventSource.onmessage = async (event) => {
         try {
             const data = JSON.parse(event.data || '{}');
-            if (data.type === 'note-added') {
+            if (data.type === 'note-added' || data.type === 'note-deleted') {
                 await loadNotes();
             }
         } catch (_err) {
@@ -210,6 +214,17 @@ async function uploadNote(e) {
     }
 }
 
+async function deleteNote(noteId) {
+    const res = await fetch(`/api/notes/${encodeURIComponent(noteId)}`, {
+        method: 'DELETE',
+        headers: { 'x-session-token': sessionToken }
+    });
+    const data = await parseJsonSafe(res);
+    if (!res.ok) {
+        throw new Error(data.message || 'Delete failed');
+    }
+}
+
 async function logout() {
     stopRealtimeUpdates();
     if (sessionToken) {
@@ -242,6 +257,27 @@ closeModalBtn.addEventListener('click', () => {
 window.addEventListener('click', (e) => {
     if (e.target === uploadModal) {
         uploadModal.style.display = 'none';
+    }
+});
+
+notesContainer.addEventListener('click', async (e) => {
+    const deleteButton = e.target.closest('.delete-btn');
+    if (!deleteButton) return;
+
+    const noteId = deleteButton.dataset.noteId;
+    if (!noteId) return;
+
+    const shouldDelete = window.confirm('Delete this note and uploaded file permanently?');
+    if (!shouldDelete) return;
+
+    deleteButton.disabled = true;
+    try {
+        await deleteNote(noteId);
+        await loadNotes();
+    } catch (error) {
+        alert(error.message);
+    } finally {
+        deleteButton.disabled = false;
     }
 });
 
