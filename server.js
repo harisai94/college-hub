@@ -9,7 +9,7 @@ require('dotenv').config();
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017';
+const MONGODB_URI = process.env.MONGODB_URI || process.env.MONGO_URL || 'mongodb://127.0.0.1:27017';
 const DB_NAME = process.env.DB_NAME || 'campushub';
 const SESSION_TTL_MS = Number(process.env.SESSION_TTL_MS) || 24 * 60 * 60 * 1000;
 const MAX_JSON_BODY = process.env.MAX_JSON_BODY || '1mb';
