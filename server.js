@@ -4,10 +4,13 @@ const crypto = require('crypto');
 
 const express = require('express');
 const multer = require('multer');
+const { MongoClient } = require('mongodb');
 require('dotenv').config();
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017';
+const DB_NAME = process.env.DB_NAME || 'campushub';
 const SESSION_TTL_MS = Number(process.env.SESSION_TTL_MS) || 24 * 60 * 60 * 1000;
 const MAX_JSON_BODY = process.env.MAX_JSON_BODY || '1mb';
 const CORS_ORIGIN = process.env.CORS_ORIGIN || '';
@@ -16,7 +19,8 @@ const OPEN_SESSION_WINDOW_MS = Number(process.env.OPEN_SESSION_WINDOW_MS) || 15 
 
 const dataDir = path.join(__dirname, 'data');
 const uploadsDir = path.join(__dirname, 'uploads');
-const dbPath = path.join(dataDir, 'repositories.json');
+const mongoClient = new MongoClient(MONGODB_URI);
+let repositoriesCollection = null;
 
 for (const dir of [dataDir, uploadsDir]) {
   if (!fs.existsSync(dir)) {
@@ -24,29 +28,46 @@ for (const dir of [dataDir, uploadsDir]) {
   }
 }
 
-if (!fs.existsSync(dbPath)) {
-  fs.writeFileSync(dbPath, JSON.stringify({ repositories: {} }, null, 2));
-}
-
 const sessions = new Map();
 const liveClientsByCode = new Map();
 const openSessionAttemptsByIp = new Map();
 
-function readDb() {
-  try {
-    const raw = fs.readFileSync(dbPath, 'utf8');
-    const parsed = JSON.parse(raw);
-    if (!parsed.repositories || typeof parsed.repositories !== 'object') {
-      return { repositories: {} };
-    }
-    return parsed;
-  } catch (_error) {
-    return { repositories: {} };
+function getRepositoriesCollection() {
+  if (!repositoriesCollection) {
+    throw new Error('MongoDB is not initialized yet.');
   }
+  return repositoriesCollection;
 }
 
-function writeDb(nextDb) {
-  fs.writeFileSync(dbPath, JSON.stringify(nextDb, null, 2));
+async function initMongo() {
+  await mongoClient.connect();
+  const db = mongoClient.db(DB_NAME);
+  repositoriesCollection = db.collection('repositories');
+  await repositoriesCollection.createIndex({ code: 1 }, { unique: true });
+  console.log(`MongoDB connected: ${MONGODB_URI}/${DB_NAME}`);
+}
+
+async function getRepositoryByCode(code) {
+  return getRepositoriesCollection().findOne({ code });
+}
+
+async function ensureRepository(code, nowIsoString) {
+  const collection = getRepositoriesCollection();
+  const result = await collection.findOneAndUpdate(
+    { code },
+    { $setOnInsert: { code, createdAt: nowIsoString, notes: [] } },
+    { upsert: true, returnDocument: 'before' }
+  );
+  return { existed: Boolean(result.value) };
+}
+
+async function getNotesByCode(code) {
+  const repo = await getRepositoryByCode(code);
+  const notes = repo && Array.isArray(repo.notes) ? repo.notes.slice() : [];
+  notes.sort((a, b) => {
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+  });
+  return notes;
 }
 
 function addLiveClient(code, res) {
@@ -80,9 +101,6 @@ function sanitizeCode(code) {
 
 function sanitizeDisplayName(name) {
   const cleaned = String(name || '').trim();
-  if (!cleaned) {
-    return 'Student';
-  }
   return cleaned.slice(0, 60);
 }
 
@@ -194,7 +212,8 @@ function getSessionFromRequest(req) {
   return sessions.get(token);
 }
 
-app.post('/api/session/open', (req, res) => {
+app.post('/api/session/open', async (req, res, next) => {
+  try {
   const ip = getIpAddress(req);
   if (isRateLimitedOpenSession(ip)) {
     res.status(429).json({ message: 'Too many attempts. Please try again later.' });
@@ -209,18 +228,13 @@ app.post('/api/session/open', (req, res) => {
     return;
   }
 
-  const db = readDb();
-  const now = new Date().toISOString();
-  const existed = Boolean(db.repositories[code]);
-
-  if (!existed) {
-    db.repositories[code] = {
-      code,
-      createdAt: now,
-      notes: []
-    };
-    writeDb(db);
+  if (displayName.length < 4) {
+    res.status(400).json({ message: 'Name is required and must be at least 4 characters.' });
+    return;
   }
+
+  const now = new Date().toISOString();
+  const { existed } = await ensureRepository(code, now);
 
   const token = crypto.randomUUID();
   sessions.set(token, {
@@ -232,10 +246,7 @@ app.post('/api/session/open', (req, res) => {
     expiresAt: Date.now() + SESSION_TTL_MS
   });
 
-  const repo = db.repositories[code];
-  const notes = Array.isArray(repo.notes) ? repo.notes.slice().sort((a, b) => {
-    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-  }) : [];
+  const notes = await getNotesByCode(code);
 
   res.json({
     created: !existed,
@@ -243,6 +254,9 @@ app.post('/api/session/open', (req, res) => {
     user: { displayName },
     notes
   });
+  } catch (error) {
+    next(error);
+  }
 });
 
 app.post('/api/session/logout', (req, res) => {
@@ -262,17 +276,17 @@ app.post('/api/session/logout', (req, res) => {
   res.json({ ok: true });
 });
 
-app.get('/api/notes', (req, res) => {
+app.get('/api/notes', async (req, res, next) => {
+  try {
   const session = getSession(req, res);
   if (!session) return;
 
-  const db = readDb();
-  const repo = db.repositories[session.code];
-  const notes = repo && Array.isArray(repo.notes) ? repo.notes.slice().sort((a, b) => {
-    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-  }) : [];
+  const notes = await getNotesByCode(session.code);
 
   res.json({ notes });
+  } catch (error) {
+    next(error);
+  }
 });
 
 app.get('/api/notes/stream', (req, res) => {
@@ -300,7 +314,8 @@ app.get('/api/notes/stream', (req, res) => {
   });
 });
 
-app.post('/api/notes', upload.single('file'), (req, res) => {
+app.post('/api/notes', upload.single('file'), async (req, res, next) => {
+  try {
   const session = getSession(req, res);
   if (!session) return;
 
@@ -330,29 +345,71 @@ app.post('/api/notes', upload.single('file'), (req, res) => {
     createdAt: now
   };
 
-  const db = readDb();
-  if (!db.repositories[session.code]) {
-    db.repositories[session.code] = {
-      code: session.code,
-      createdAt: now,
-      notes: []
-    };
-  }
-  db.repositories[session.code].notes = db.repositories[session.code].notes || [];
-  db.repositories[session.code].notes.push(note);
-  writeDb(db);
+  await ensureRepository(session.code, now);
+  await getRepositoriesCollection().updateOne(
+    { code: session.code },
+    { $push: { notes: note } }
+  );
   broadcastToCode(session.code, { type: 'note-added', noteId: note.id });
 
   res.status(201).json({ note });
+  } catch (error) {
+    next(error);
+  }
 });
 
-app.get('/api/health', (_req, res) => {
-  res.json({
-    ok: true,
-    uptimeSec: Math.floor(process.uptime()),
-    sessions: sessions.size,
-    repositories: Object.keys(readDb().repositories || {}).length
-  });
+app.delete('/api/notes/:id', async (req, res, next) => {
+  try {
+  const session = getSession(req, res);
+  if (!session) return;
+
+  const noteId = sanitizeText(req.params?.id, 100);
+  if (!noteId) {
+    res.status(400).json({ message: 'Note id is required.' });
+    return;
+  }
+
+  const repo = await getRepositoryByCode(session.code);
+  const notes = repo && Array.isArray(repo.notes) ? repo.notes : [];
+  const noteToDelete = notes.find((note) => note.id === noteId);
+
+  if (!noteToDelete) {
+    res.status(404).json({ message: 'Note not found.' });
+    return;
+  }
+
+  if (noteToDelete.filePath) {
+    const filename = path.basename(noteToDelete.filePath);
+    const absolutePath = path.join(uploadsDir, filename);
+    if (fs.existsSync(absolutePath)) {
+      fs.unlinkSync(absolutePath);
+    }
+  }
+
+  await getRepositoriesCollection().updateOne(
+    { code: session.code },
+    { $pull: { notes: { id: noteId } } }
+  );
+
+  broadcastToCode(session.code, { type: 'note-deleted', noteId });
+  res.json({ ok: true, deletedId: noteId });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get('/api/health', async (_req, res, next) => {
+  try {
+    const repositories = await getRepositoriesCollection().countDocuments();
+    res.json({
+      ok: true,
+      uptimeSec: Math.floor(process.uptime()),
+      sessions: sessions.size,
+      repositories
+    });
+  } catch (error) {
+    next(error);
+  }
 });
 
 app.use((err, _req, res, _next) => {
@@ -371,9 +428,16 @@ app.use((_req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-app.listen(PORT, () => {
-  console.log(`CampusHub server running at http://localhost:${PORT}`);
-});
+initMongo()
+  .then(() => {
+    app.listen(PORT, () => {
+      console.log(`CampusHub server running at http://localhost:${PORT}`);
+    });
+  })
+  .catch((error) => {
+    console.error('Failed to start server:', error);
+    process.exit(1);
+  });
 
 setInterval(() => {
   cleanupExpiredSessions();
