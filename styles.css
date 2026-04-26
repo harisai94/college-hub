@@ -362,7 +362,13 @@ body::after {
     margin-bottom: 0.8rem;
 }
 
-.download-btn {
+.card-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+}
+
+.card-action-btn {
     background: #eef2ff;
     border: none;
     color: var(--primary);
@@ -374,9 +380,18 @@ body::after {
     transition: background 0.2s, transform 0.2s;
 }
 
-.download-btn:hover {
+.card-action-btn:hover {
     background: #dbeafe;
     transform: translateY(-1px);
+}
+
+.delete-btn {
+    background: #fee2e2;
+    color: #b91c1c;
+}
+
+.delete-btn:hover {
+    background: #fecaca;
 }
 
 /* --- Modal Styles --- */
