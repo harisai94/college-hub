@@ -8,14 +8,15 @@ require('dotenv').config();
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
+const STORAGE_DIR = process.env.STORAGE_DIR || '/app/storage';
 const SESSION_TTL_MS = Number(process.env.SESSION_TTL_MS) || 24 * 60 * 60 * 1000;
 const MAX_JSON_BODY = process.env.MAX_JSON_BODY || '1mb';
 const CORS_ORIGIN = process.env.CORS_ORIGIN || '';
 const OPEN_SESSION_RATE_LIMIT = Number(process.env.OPEN_SESSION_RATE_LIMIT) || 20;
 const OPEN_SESSION_WINDOW_MS = Number(process.env.OPEN_SESSION_WINDOW_MS) || 15 * 60 * 1000;
 
-const dataDir = path.join(__dirname, 'data');
-const uploadsDir = path.join(__dirname, 'uploads');
+const dataDir = path.join(STORAGE_DIR, 'data');
+const uploadsDir = path.join(STORAGE_DIR, 'uploads');
 const dbPath = path.join(dataDir, 'repositories.json');
 
 for (const dir of [dataDir, uploadsDir]) {
