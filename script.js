@@ -149,12 +149,28 @@ function showMessage(text, isError = false) {
 
 async function openRepository(e) {
     e.preventDefault();
+    const displayName = displayNameInput.value.trim();
+    const code = accessCodeInput.value.trim();
+
+    if (displayName.length < 4) {
+        showMessage('Name is required and must be at least 4 characters.', true);
+        return;
+    }
+
+    if (code.length < 6) {
+        showMessage('Access code must be at least 6 characters.', true);
+        return;
+    }
+
     const payload = {
-        code: accessCodeInput.value,
-        displayName: displayNameInput.value
+        code,
+        displayName
     };
 
+    const submitButton = entryForm.querySelector('button[type="submit"]');
     try {
+        if (submitButton) submitButton.disabled = true;
+        showMessage('Opening repository...');
         const res = await fetch('/api/session/open', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -179,6 +195,8 @@ async function openRepository(e) {
         }, 350);
     } catch (error) {
         showMessage(error.message, true);
+    } finally {
+        if (submitButton) submitButton.disabled = false;
     }
 }
 
