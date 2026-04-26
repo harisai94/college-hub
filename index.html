@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CampusHub | Notes Sharing</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="entry-overlay" id="entry-overlay">
+        <div class="entry-card">
+            <p class="entry-kicker">Private Workspace Access</p>
+            <h2>Enter Your Campus Code</h2>
+            <p class="entry-text">New code creates a clean repository. Existing code opens your previously uploaded files.</p>
+            <form id="entry-form">
+                <div class="form-group">
+                    <label for="display-name">Name</label>
+                    <input type="text" id="display-name" placeholder="Your name (optional)">
+                </div>
+                <div class="form-group">
+                    <label for="access-code">Access Code</label>
+                    <input type="password" id="access-code" minlength="6" required placeholder="Enter secure code">
+                </div>
+                <button type="submit" class="btn-primary full-width">
+                    <i class="fa-solid fa-right-to-bracket"></i> Open Repository
+                </button>
+                <p class="entry-note" id="entry-note"></p>
+            </form>
+        </div>
+    </div>
+
+    <nav class="navbar">
+        <div class="nav-brand">
+            <i class="fa-solid fa-graduation-cap"></i> CampusHub
+        </div>
+        <div class="nav-search">
+            <input type="text" id="search-bar" placeholder="Search for notes, subjects...">
+            <i class="fa-solid fa-search"></i>
+        </div>
+        <div class="nav-actions">
+            <button class="btn-primary" id="open-upload-btn">
+                <i class="fa-solid fa-cloud-arrow-up"></i> Upload Notes
+            </button>
+            <div class="profile-icon" id="profile-chip"><i class="fa-solid fa-user"></i></div>
+            <button class="btn-ghost" id="logout-btn">
+                <i class="fa-solid fa-right-from-bracket"></i> Logout
+            </button>
+        </div>
+    </nav>
+
+    <header class="hero">
+        <div class="hero-content">
+            <p class="hero-kicker">Academic Resource Platform</p>
+            <h1>Discover, Share, and Organize Your Study Materials</h1>
+            <p class="hero-text">A clean and reliable workspace for students to access high-quality notes across departments and semesters.</p>
+        </div>
+    </header>
+
+    <main class="container">
+        <aside class="sidebar">
+            <h3>Filters</h3>
+            
+            <div class="filter-group">
+                <label for="dept-filter">Department</label>
+                <select id="dept-filter">
+                    <option value="All">All Departments</option>
+                    <option value="Computer Science">Computer Science</option>
+                    <option value="Mechanical">Mechanical</option>
+                    <option value="Business">Business</option>
+                </select>
+            </div>
+
+            <div class="filter-group">
+                <label for="sem-filter">Semester</label>
+                <select id="sem-filter">
+                    <option value="All">All Semesters</option>
+                    <option value="Semester 1">Semester 1</option>
+                    <option value="Semester 2">Semester 2</option>
+                    <option value="Semester 3">Semester 3</option>
+                    <option value="Semester 4">Semester 4</option>
+                </select>
+            </div>
+        </aside>
+
+        <section class="notes-section">
+            <div class="section-header">
+                <h2>Recent Study Materials</h2>
+                <span id="results-count">Showing all notes</span>
+            </div>
+            <div class="notes-grid" id="notes-container">
+                </div>
+        </section>
+    </main>
+
+    <div class="modal-overlay" id="upload-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Upload Study Material</h2>
+                <button class="close-btn" id="close-modal-btn"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <form id="upload-form">
+                <div class="form-group">
+                    <label>Document Title</label>
+                    <input type="text" id="note-title" placeholder="e.g., Data Structures Midterm Notes" required>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Department</label>
+                        <select id="note-department" required>
+                            <option value="">Select Dept...</option>
+                            <option value="Computer Science">Computer Science</option>
+                            <option value="Mechanical">Mechanical</option>
+                            <option value="Business">Business</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Semester</label>
+                        <select id="note-semester" required>
+                            <option value="">Select Sem...</option>
+                            <option value="Semester 1">Semester 1</option>
+                            <option value="Semester 2">Semester 2</option>
+                            <option value="Semester 3">Semester 3</option>
+                            <option value="Semester 4">Semester 4</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Quick Note (optional)</label>
+                    <textarea id="note-text" rows="4" placeholder="Add a short text note for this file..."></textarea>
+                </div>
+                <div class="form-group file-drop-area">
+                    <i class="fa-regular fa-file-pdf"></i>
+                    <p>Upload notes or PDF file</p>
+                    <input type="file" id="note-file" accept=".pdf,.doc,.docx,.txt">
+                </div>
+                <button type="submit" class="btn-primary full-width">Upload to Hub</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="script.js?v=3"></script>
+</body>
+</html>
